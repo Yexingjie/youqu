@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生日专属消消乐</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "微软雅黑", sans-serif;
+        }
+        body {
+            background: #fef5f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 10px;
+        }
+        .game-title {
+            font-size: 28px;
+            color: #d85b8b;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .info-bar {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #666;
+        }
+        #gameBox {
+            border: 3px solid #e8a8c0;
+            border-radius: 12px;
+            background: #fff;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+        }
+        .cell {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            cursor: grab;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        /* 三种图案不同边框颜色区分 */
+        .type0 { border: 3px solid #4285f4; }
+        .type1 { border: 3px solid #ff6b9d; }
+        .type2 { border: 3px solid #b185db; }
+        .cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+        .cell.active {
+            transform: scale(1.1);
+            box-shadow: 0 0 12px #ff88bb;
+        }
+        .cell.remove {
+            opacity: 0;
+            transform: scale(0);
+        }
+        .tip-text {
+            margin-top: 15px;
+            color: #999;
+            font-size: 14px;
+        }
+        .win-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .win-box {
+            background: #fff;
+            padding: 40px 30px;
+            border-radius: 16px;
+            text-align: center;
+        }
+        .win-box h2 {
+            color: #ff5a8c;
+            margin-bottom: 20px;
+        }
+        .restart-btn {
+            padding: 10px 25px;
+            background: #ff7ca6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="game-title">生日专属消消乐</h1>
+    <div class="info-bar">
+        <div>得分：<span id="score">0</span></div>
+        <div>目标：<span id="target">200</span>分通关</div>
+    </div>
+    <div id="gameBox"></div>
+    <p class="tip-text">拖动方块交换位置，3个相同连成一线即可消除~</p>
+
+    <!-- 通关弹窗 -->
+    <div class="win-modal" id="winModal">
+        <div class="win-box">
+            <h2>🎉 恭喜通关！生日快乐 🎉</h2>
+            <button class="restart-btn" onclick="initGame()">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+        // 相对路径读取仓库内图片，永久有效
+        const IMG_LIST = [
+            "./img1.jpg",
+            "./img2.jpg",
+            "./img3.jpg"
+        ];
+        const COLS = 6;
+        const ROWS = 6;
+        const TYPE_COUNT = 3;
+        let grid = [];
+        let score = 0;
+        const TARGET_SCORE = 200;
+        let dragStartCell = null;
+
+        function initGame() {
+            score = 0;
+            document.getElementById("score").textContent = score;
+            document.getElementById("winModal").style.display = "none";
+            grid = [];
+            for(let y=0; y<ROWS; y++){
+                grid[y] = [];
+                for(let x=0; x<COLS; x++){
+                    let type = getRandomType();
+                    while(checkHasMatch(x, y, type)){
+                        type = getRandomType();
+                    }
+                    grid[y][x] = type;
+                }
+            }
+            renderGrid();
+        }
+
+        function getRandomType(){
+            return Math.floor(Math.random() * TYPE_COUNT);
+        }
+
+        function checkHasMatch(x, y, type){
+            if(x >= 2){
+                if(grid[y][x-1] === type && grid[y][x-2] === type) return true;
+            }
+            if(y >= 2){
+                if(grid[y-1][x] === type && grid[y-2][x] === type) return true;
+            }
+            return false;
+        }
+
+        function renderGrid(){
+            const box = document.getElementById("gameBox");
+            box.innerHTML = "";
+            box.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+
+            for(let y=0; y<ROWS; y++){
+                for(let x=0; x<COLS; x++){
+                    const type = grid[y][x];
+                    const cell = document.createElement("div");
+                    cell.className = `cell type${type}`;
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+
+                    const img = document.createElement("img");
+                    img.src = IMG_LIST[type];
+                    img.alt = "生日图片";
+                    cell.appendChild(img);
+
+                    cell.addEventListener("mousedown", dragStart);
+                    cell.addEventListener("touchstart", dragStart, {passive:true});
+                    box.appendChild(cell);
+                }
+            }
+        }
+
+        function dragStart(e){
+            e.preventDefault();
+            const cell = e.currentTarget;
+            dragStartCell = {
+                x: parseInt(cell.dataset.x),
+                y: parseInt(cell.dataset.y),
+                el: cell
+            };
+            cell.classList.add("active");
+
+            document.addEventListener("mousemove", dragMove);
+            document.addEventListener("touchmove", dragMove, {passive:false});
+            document.addEventListener("mouseup", dragEnd);
+            document.addEventListener("touchend", dragEnd);
+        }
+
+        function dragMove(e){
+            if(!dragStartCell) return;
+            const touch = e.touches ? e.touches[0] : e;
+            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+            if(!elem || !elem.classList.contains("cell")) return;
+        }
+
+        function dragEnd(e){
+            document.removeEventListener("mousemove", dragMove);
+            document.removeEventListener("touchmove", dragMove);
+            document.removeEventListener("mouseup", dragEnd);
+            document.removeEventListener("touchend", dragEnd);
+            if(!dragStartCell) return;
+            dragStartCell.el.classList.remove("active");
+
+            const touch = e.changedTouches ? e.changedTouches[0] : e;
+            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+            if(!targetEl || !targetEl.classList.contains("cell")){
+                dragStartCell = null;
+                return;
+            }
+
+            const tx = parseInt(targetEl.dataset.x);
+            const ty = parseInt(targetEl.dataset.y);
+            const sx = dragStartCell.x;
+            const sy = dragStartCell.y;
+
+            const isNear = (Math.abs(tx - sx) === 1 && ty === sy) || (Math.abs(ty - sy) === 1 && tx === sx);
+            if(!isNear){
+                dragStartCell = null;
+                return;
+            }
+
+            [grid[sy][sx], grid[ty][tx]] = [grid[ty][tx], grid[sy][sx]];
+            renderGrid();
+
+            setTimeout(()=>{
+                if(!checkAllMatch()){
+                    [grid[sy][sx], grid[ty][tx]] = [grid[ty][tx], grid[sy][sx]];
+                    renderGrid();
+                }
+                dragStartCell = null;
+            }, 250);
+        }
+
+        function checkAllMatch(){
+            let matchList = new Set();
+            for(let y=0; y<ROWS; y++){
+                for(let x=0; x<COLS-2; x++){
+                    const t = grid[y][x];
+                    if(t !== null && grid[y][x+1] === t && grid[y][x+2] === t){
+                        matchList.add(`${x},${y}`);
+                        matchList.add(`${x+1},${y}`);
+                        matchList.add(`${x+2},${y}`);
+                        let k = x+3;
+                        while(k < COLS && grid[y][k] === t){
+                            matchList.add(`${k},${y}`);
+                            k++;
+                        }
+                    }
+                }
+            }
+            for(let x=0; x<COLS; x++){
+                for(let y=0; y<ROWS-2; y++){
+                    const t = grid[y][x];
+                    if(t !== null && grid[y+1][x] === t && grid[y+2][x] === t){
+                        matchList.add(`${x},${y}`);
+                        matchList.add(`${x},${y+1}`);
+                        matchList.add(`${x},${y+2}`);
+                        let k = y+3;
+                        while(k < ROWS && grid[k][x] === t){
+                            matchList.add(`${x},${k}`);
+                            k++;
+                        }
+                    }
+                }
+            }
+
+            if(matchList.size === 0) return false;
+            score += matchList.size * 10;
+            document.getElementById("score").textContent = score;
+            matchList.forEach(key=>{
+                const [x,y] = key.split(",").map(Number);
+                grid[y][x] = null;
+            });
+
+            renderGrid();
+            setTimeout(()=>{
+                dropBlocks();
+                fillEmpty();
+                renderGrid();
+                setTimeout(()=>{
+                    checkAllMatch();
+                    if(score >= TARGET_SCORE){
+                        document.getElementById("winModal").style.display = "flex";
+                    }
+                }, 300);
+            }, 300);
+            return true;
+        }
+
+        function dropBlocks(){
+            for(let x=0; x<COLS; x++){
+                for(let y=ROWS-1; y>0; y--){
+                    if(grid[y][x] === null){
+                        for(let k=y-1; k>=0; k--){
+                            if(grid[k][x] !== null){
+                                grid[y][x] = grid[k][x];
+                                grid[k][x] = null;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function fillEmpty(){
+            for(let x=0; x<COLS; x++){
+                for(let y=0; y<ROWS; y++){
+                    if(grid[y][x] === null){
+                        grid[y][x] = getRandomType();
+                    }
+                }
+            }
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
